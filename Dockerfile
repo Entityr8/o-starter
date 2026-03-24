@@ -11,6 +11,10 @@ RUN wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/c
 RUN echo 'root:123456' | chpasswd && \
     sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
 
+# Flexible persistent directory (using environment variables)
+ENV PERSISTENT_DIR=/data
+RUN mkdir -p ${PERSISTENT_DIR}
+
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
