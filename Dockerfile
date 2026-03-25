@@ -1,10 +1,13 @@
 FROM ubuntu:24.04
 
+SHELL ["/bin/bash", "-c"]
+
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         openssh-server sudo wget ca-certificates procps iputils-ping \
-        bash dash curl git && \         
+        bash dash curl git && \
     mkdir -p /var/run/sshd /etc/ssh /data && \
+    ln -sf /usr/bin/dash /bin/sh && \
     rm -rf /var/lib/apt/lists/*
 
 RUN wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 && \
@@ -22,4 +25,4 @@ RUN chmod +x /start.sh
 
 EXPOSE 22
 
-CMD ["/start.sh"]
+ENTRYPOINT ["/bin/bash", "/start.sh"]

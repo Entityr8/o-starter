@@ -162,11 +162,15 @@ start_cloudflared() {
     sleep 8
 
     # ====================== OPENCLAW AUTO START ======================
-    echo "🦞 Starting OpenClaw gateway automatically..."
-    su - "$SSH_USERNAME" -c '
-        export PATH="/data/home/dev/.npm-global/bin:$PATH"
-        openclaw gateway --port 18789 --force
-    ' > /data/openclaw.log 2>&1 &
+    if su - "$SSH_USERNAME" -c 'export PATH="/data/home/dev/.npm-global/bin:$PATH"; command -v openclaw >/dev/null 2>&1'; then
+        echo "Starting OpenClaw gateway automatically..."
+        su - "$SSH_USERNAME" -c '
+            export PATH="/data/home/dev/.npm-global/bin:$PATH"
+            openclaw gateway --port 18789 --force
+        ' > /data/openclaw.log 2>&1 &
+    else
+        echo "OpenClaw not found in PATH. Skipping automatic startup."
+    fi
     # ================================================================
 
     print_summary
