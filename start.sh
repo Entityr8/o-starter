@@ -84,7 +84,9 @@ ensure_user() {
         chmod 600 "$user_home/.ssh/authorized_keys"
     fi
 
-    echo "$SSH_USERNAME:$SSH_PASSWORD" | chpasswd
+    if [ -n "$SSH_PASSWORD" ]; then
+        echo "$SSH_USERNAME:$SSH_PASSWORD" | chpasswd
+    fi
 }
 
 write_sshd_config() {
