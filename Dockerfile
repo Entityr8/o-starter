@@ -1,7 +1,9 @@
 FROM ubuntu:24.04
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends openssh-server sudo wget ca-certificates procps iputils-ping && \
+    apt-get install -y --no-install-recommends \
+        openssh-server sudo wget ca-certificates procps iputils-ping \
+        bash dash curl git && \         
     mkdir -p /var/run/sshd /etc/ssh /data && \
     rm -rf /var/lib/apt/lists/*
 

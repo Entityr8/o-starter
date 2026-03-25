@@ -156,13 +156,19 @@ start_cloudflared() {
 
     if [ -n "$CF_TUNNEL_TOKEN" ]; then
         cloudflared tunnel run --token "$CF_TUNNEL_TOKEN" > "$LOG_FILE" 2>&1 &
-        sleep 5
-        print_summary
-        exec tail -f "$LOG_FILE"
+    else
+        cloudflared tunnel --url ssh://localhost:22 > "$LOG_FILE" 2>&1 &
     fi
+    sleep 8
 
-    cloudflared tunnel --url ssh://localhost:22 > "$LOG_FILE" 2>&1 &
-    sleep 10
+    # ====================== OPENCLAW AUTO START ======================
+    echo "🦞 Starting OpenClaw gateway automatically..."
+    su - "$SSH_USERNAME" -c '
+        export PATH="/data/home/dev/.npm-global/bin:$PATH"
+        openclaw gateway --port 18789 --force
+    ' > /data/openclaw.log 2>&1 &
+    # ================================================================
+
     print_summary
     exec tail -f "$LOG_FILE"
 }
