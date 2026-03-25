@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
+
 PERSISTENT_DIR="${PERSISTENT_DIR:-/data}"
 SSH_USERNAME="${SSH_USERNAME:-dev}"
 ALLOW_ROOT_LOGIN="${ALLOW_ROOT_LOGIN:-false}"
