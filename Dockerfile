@@ -14,9 +14,8 @@ RUN wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/c
     chmod +x cloudflared-linux-amd64 && \
     mv cloudflared-linux-amd64 /usr/local/bin/cloudflared
 
-RUN curl -fsSL https://ollama.com/install.sh | sh
-
 ENV PERSISTENT_DIR=/data
+ENV SSH_USERNAME=dev
 ENV ALLOW_ROOT_LOGIN=false
 ENV ALLOW_PASSWORD_AUTH=false
 ENV CF_USE_QUICK_TUNNEL=false

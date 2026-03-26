@@ -16,6 +16,7 @@ CF_TUNNEL_HOSTNAME="${CF_TUNNEL_HOSTNAME:-}"
 CF_OLLAMA_HOSTNAME="${CF_OLLAMA_HOSTNAME:-}"
 LOG_FILE="/tmp/cloudflared.log"
 OLLAMA_LOG_FILE="/tmp/ollama.log"
+OLLAMA_INSTALL_DIR="/usr/local/bin/ollama"
 
 bool_is_true() {
     case "${1,,}" in
@@ -132,7 +133,17 @@ start_sshd() {
     /usr/sbin/sshd
 }
 
+install_ollama() {
+    if [ -x "$OLLAMA_INSTALL_DIR" ]; then
+        return 0
+    fi
+
+    echo "Installing Ollama at runtime..."
+    curl -fsSL https://ollama.com/install.sh | sh
+}
+
 start_ollama() {
+    install_ollama
     mkdir -p "$OLLAMA_MODELS"
     rm -f "$OLLAMA_LOG_FILE"
     ollama serve > "$OLLAMA_LOG_FILE" 2>&1 &
