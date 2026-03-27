@@ -21,7 +21,7 @@ ENV ALLOW_PASSWORD_AUTH=false
 ENV CF_USE_QUICK_TUNNEL=false
 
 ENV OLLAMA_HOST=0.0.0.0:11434
-ENV OLLAMA_MODELS=/opt/ollama-models
+ENV OLLAMA_MODELS=/data/ollama-models
 
 COPY start.sh /start.sh
 RUN chmod +x /start.sh

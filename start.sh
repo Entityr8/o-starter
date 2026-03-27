@@ -14,9 +14,10 @@ SSH_PASSWORD="${SSH_PASSWORD:-}"
 CF_TUNNEL_TOKEN="${CF_TUNNEL_TOKEN:-}"
 CF_TUNNEL_HOSTNAME="${CF_TUNNEL_HOSTNAME:-}"
 CF_OLLAMA_HOSTNAME="${CF_OLLAMA_HOSTNAME:-}"
-LOG_FILE="/tmp/cloudflared.log"
-OLLAMA_LOG_FILE="/tmp/ollama.log"
+OLLAMA_MODELS="${OLLAMA_MODELS:-$PERSISTENT_DIR/ollama-models}"
 OLLAMA_INSTALL_DIR="/usr/local/bin/ollama"
+OLLAMA_URL="http://127.0.0.1:11434"
+SSH_LOG_URL="ssh://localhost:22"
 
 bool_is_true() {
     case "${1,,}" in
@@ -55,7 +56,7 @@ require_tunnel_config() {
 }
 
 setup_persistent_storage() {
-    mkdir -p "$PERSISTENT_DIR/home" "$PERSISTENT_DIR/root" "$PERSISTENT_DIR/ssh"
+    mkdir -p "$PERSISTENT_DIR/home" "$PERSISTENT_DIR/root" "$PERSISTENT_DIR/ssh" "$OLLAMA_MODELS"
 }
 
 setup_host_keys() {
@@ -130,7 +131,8 @@ EOF
 }
 
 start_sshd() {
-    /usr/sbin/sshd
+    /usr/sbin/sshd -D &
+    SSHD_PID=$!
 }
 
 install_ollama() {
@@ -143,10 +145,17 @@ install_ollama() {
 }
 
 start_ollama() {
-    install_ollama
-    mkdir -p "$OLLAMA_MODELS"
-    rm -f "$OLLAMA_LOG_FILE"
-    ollama serve > "$OLLAMA_LOG_FILE" 2>&1 &
+    ollama serve &
+    OLLAMA_PID=$!
+}
+
+start_cloudflared() {
+    if [ -n "$CF_TUNNEL_TOKEN" ]; then
+        cloudflared tunnel run --token "$CF_TUNNEL_TOKEN" &
+    else
+        cloudflared tunnel --url "$SSH_LOG_URL" &
+    fi
+    CLOUDFLARED_PID=$!
 }
 
 print_summary() {
@@ -160,12 +169,7 @@ print_summary() {
         echo "SSH hostname: $CF_TUNNEL_HOSTNAME"
         echo "SSH command: ssh -i ~/.ssh/your_key $SSH_USERNAME@$CF_TUNNEL_HOSTNAME -o ProxyCommand=\"cloudflared access ssh --hostname %h\" -o IdentitiesOnly=yes"
     elif bool_is_true "$CF_USE_QUICK_TUNNEL"; then
-        local url=""
-        url=$(grep -o "https://[a-z0-9.-]*trycloudflare.com" "$LOG_FILE" | head -n1 | sed 's#https://##' || true)
-        if [ -n "$url" ]; then
-            echo "SSH hostname: $url"
-            echo "SSH command: ssh -i ~/.ssh/your_key $SSH_USERNAME@$url -o ProxyCommand=\"cloudflared access ssh --hostname %h\" -o IdentitiesOnly=yes"
-        fi
+        echo "SSH hostname: check cloudflared logs for the trycloudflare.com URL"
     else
         echo "SSH hostname: use the hostname configured on your Cloudflare named tunnel"
     fi
@@ -179,31 +183,28 @@ print_summary() {
     echo "=========================================================="
 }
 
-start_cloudflared() {
-    rm -f "$LOG_FILE"
+cleanup() {
+    local exit_code=$?
 
-    if [ -n "$CF_TUNNEL_TOKEN" ]; then
-        cloudflared tunnel run --token "$CF_TUNNEL_TOKEN" > "$LOG_FILE" 2>&1 &
-    else
-        cloudflared tunnel --url ssh://localhost:22 > "$LOG_FILE" 2>&1 &
-    fi
-    sleep 8
+    for pid in "${CLOUDFLARED_PID:-}" "${OLLAMA_PID:-}" "${SSHD_PID:-}"; do
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            kill "$pid" 2>/dev/null || true
+        fi
+    done
 
-    # ====================== OPENCLAW AUTO START ======================
-    if su - "$SSH_USERNAME" -c "export PATH=\"$PERSISTENT_DIR/home/$SSH_USERNAME/.npm-global/bin:\$PATH\"; command -v openclaw >/dev/null 2>&1"; then
-        echo "Starting OpenClaw gateway automatically..."
-        su - "$SSH_USERNAME" -c "
-            export PATH=\"$PERSISTENT_DIR/home/$SSH_USERNAME/.npm-global/bin:\$PATH\"
-            openclaw gateway --port 18789 --force
-        " > /data/openclaw.log 2>&1 &
-    else
-        echo "OpenClaw not found in PATH. Skipping automatic startup."
-    fi
-    # ================================================================
-
-    print_summary
-    exec tail -f "$LOG_FILE" "$OLLAMA_LOG_FILE"
+    wait || true
+    exit "$exit_code"
 }
+
+wait_for_processes() {
+    set +e
+    wait -n "$SSHD_PID" "$OLLAMA_PID" "$CLOUDFLARED_PID"
+    local exit_code=$?
+    set -e
+    return "$exit_code"
+}
+
+trap cleanup EXIT INT TERM
 
 require_ssh_auth
 require_tunnel_config
@@ -212,5 +213,8 @@ setup_host_keys
 ensure_user
 write_sshd_config
 start_sshd
+install_ollama
 start_ollama
 start_cloudflared
+print_summary
+wait_for_processes
